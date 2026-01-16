@@ -10,10 +10,10 @@ kernel void perceptualHash(
     device float *outHashGrid [[buffer(0)]], 
     uint2 gid [[thread_position_in_grid]],
     uint2 tid [[thread_position_in_threadgroup]],
-    uint2 t_per_tg [[threads_per_threadgroup]])
+    uint2 t_per_tg [[threads_per_threadgroup]],
+    uint lane_id [[thread_index_in_simdgroup]])
 {
-    // Launch with a threadgroup size that covers one 8x8 block region
-    // e.g., 16x16 threads per threadgroup
+    // Launch with a threadgroup size that covers one 8x8 block region (e.g., 16x16)
     
     uint width = inTexture.get_width();
     uint height = inTexture.get_height();
@@ -42,21 +42,20 @@ kernel void perceptualHash(
     // SIMD-group reduction
     localSum = simd_sum(localSum);
     
-    // Threadgroup reduction using shared memory if needed, 
-    // but for 16x16=256 threads, 8-32 SIMD groups is enough for atomic add to shared
+    // Threadgroup reduction using shared memory
     threadgroup float sharedSum;
-    if (all(tid == uint2(0))) {
+    if (tid.x == 0 && tid.y == 0) {
         sharedSum = 0.0f;
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
     
-    if (lane_id_in_simdgroup == 0) {
+    if (lane_id == 0) {
         atomic_fetch_add_explicit((threadgroup atomic_float*)&sharedSum, localSum, memory_order_relaxed);
     }
     
     threadgroup_barrier(mem_flags::mem_threadgroup);
     
-    if (all(tid == uint2(0))) {
+    if (tid.x == 0 && tid.y == 0) {
         outHashGrid[gridY * 8 + gridX] = sharedSum;
     }
 }

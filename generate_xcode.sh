@@ -62,7 +62,8 @@ targets:
           xcrun metal -c "\$SRCROOT/MinimaVision/Kernels/Shaders.metal" -o "\$BUILT_PRODUCTS_DIR/Shaders.air"
           xcrun metal -c "\$SRCROOT/MinimaVision/Kernels/VisualHash.metal" -o "\$BUILT_PRODUCTS_DIR/VisualHash.air"
           xcrun metal -c "\$SRCROOT/MinimaVision/Kernels/FlashAttention.metal" -o "\$BUILT_PRODUCTS_DIR/FlashAttention.air"
-          xcrun metallib "\$BUILT_PRODUCTS_DIR/Shaders.air" "\$BUILT_PRODUCTS_DIR/VisualHash.air" "\$BUILT_PRODUCTS_DIR/FlashAttention.air" -o "\$BUILT_PRODUCTS_DIR/default.metallib"
+          xcrun metal -c "\$SRCROOT/MinimaVision/Kernels/LLMKernels.metal" -o "\$BUILT_PRODUCTS_DIR/LLMKernels.air"
+          xcrun metallib "\$BUILT_PRODUCTS_DIR/Shaders.air" "\$BUILT_PRODUCTS_DIR/VisualHash.air" "\$BUILT_PRODUCTS_DIR/FlashAttention.air" "\$BUILT_PRODUCTS_DIR/LLMKernels.air" -o "\$BUILT_PRODUCTS_DIR/default.metallib"
 
   # Widget Extension
   MinimaWidgets:
