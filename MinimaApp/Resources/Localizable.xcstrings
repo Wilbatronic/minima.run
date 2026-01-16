@@ -1,0 +1,56 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "app.name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Minima" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Minima" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Minima" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Minima" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Minima" } }
+      }
+    },
+    "input.placeholder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ask Minima..." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Demandez à Minima..." } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Fragen Sie Minima..." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Minimaに聞く..." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "问 Minima..." } }
+      }
+    },
+    "settings.general" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Général" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Allgemein" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "一般" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通用" } }
+      }
+    },
+    "settings.account" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Account" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Compte" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Konto" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アカウント" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "账户" } }
+      }
+    },
+    "pro.upgrade" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Upgrade to Pro" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Passer à Pro" } },
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Auf Pro upgraden" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Proにアップグレード" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "升级到专业版" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}
