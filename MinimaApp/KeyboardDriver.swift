@@ -1,9 +1,9 @@
 import Cocoa
 import CoreGraphics
 
-/// "The Fingers"
-/// Handles agentic keyboard input with human-like timing.
-/// Pairs with MouseDriver to complete "Computer Use" capability.
+/// Keyboard Input Driver
+/// Handles programmatic keyboard event injection with simulated timing.
+/// Interfaces with CoreGraphics/HID to simulate user input.
 public class KeyboardDriver {
     public static let shared = KeyboardDriver()
     

@@ -1,16 +1,16 @@
 import Foundation
 
-/// "The Oracle"
-/// Implements Speculative Decoding for high-speed inference.
+/// Speculative Inference Engine
+/// Implements Speculative Decoding for optimized inference throughput.
 /// Actor-isolated to manage generation state safely.
 public actor SpeculativeEngine {
     public static let shared = SpeculativeEngine()
     
     private init() {}
     
-    /// Main speculative loop with Vanguard Confidence-Gating
+    /// Main speculative decoding loop with dynamic confidence-gated lookahead.
     public func generate(prompt: String) async -> String {
-        print("[Vanguard] Starting CG-Spec generation for: \(prompt)")
+        print("[Inference] Starting CG-Spec generation for: \(prompt)")
         
         var fullResponse = ""
         var isComplete = false
@@ -28,15 +28,15 @@ public actor SpeculativeEngine {
             fullResponse += verified.joined()
             isComplete = shouldStop
             
-            // 3. VANGUARD LOGIC: Confidence-Gated Scaling
-            // If we accepted everything and confidence is high, aggressively expand.
-            // If we failed early, contract immediately to save verification cost.
+            // 3. Dynamic Lookahead Calibration
+            // If verification is successful and confidence is high, expand the lookahead window.
+            // If divergence is detected, contraction minimizes verification overhead.
             if verified.count == draft.count && confidence > 0.95 {
                 currentLookahead = min(currentLookahead * 2, maxLookahead)
-                print("[Vanguard] Confidence High (\(Int(confidence*100))%). Expanding lookahead to \(currentLookahead).")
+                print("[Inference] High Confidence (\(Int(confidence*100))%). Expanding lookahead to \(currentLookahead).")
             } else if verified.count < draft.count {
                 currentLookahead = max(minLookahead, verified.count + 1)
-                print("[Vanguard] Divergence detected. Contracting lookahead to \(currentLookahead).")
+                print("[Inference] Divergence detected. Contracting lookahead to \(currentLookahead).")
             }
             
             if fullResponse.count > 2000 { break }

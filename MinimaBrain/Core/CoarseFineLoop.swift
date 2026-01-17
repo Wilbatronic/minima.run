@@ -35,18 +35,18 @@ public class MinimaBrain: ObservableObject {
             }
         }
         
-        // 2. Vision -> Brain (Vanguard Delta-Gating)
+        // 2. Vision -> Brain (Temporal Delta-Gating)
         vision.onEmbeddingsGenerated = { [weak self] embeddings in
             Task { @MainActor in
                 guard let self = self else { return }
                 
-                // Vanguard Optimization: Only ingest if the visual delta is above threshold
-                // This prevents redundant "eye" processing on static screens.
+                // Optimization: Only ingest if the visual delta is above a specific threshold.
+                // This prevents redundant processing of visual features on stagnant screens.
                 let delta = await self.eyes.getLastFrameDelta()
                 if delta > 0.05 { // 5% change threshold
                     self.handleVisualEmbeddings(embeddings)
                 } else {
-                    print("[Vanguard] Visual Delta (\(delta)) below threshold. Skipping redundant ingestion.")
+                    print("[Inference] Visual Delta (\(delta)) below threshold. Skipping redundant processing.")
                 }
             }
         }

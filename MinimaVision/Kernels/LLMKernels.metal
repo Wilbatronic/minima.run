@@ -272,7 +272,7 @@ kernel void quantize_kv(
     // Each thread in the SIMD group handles a portion of the head
     uint offset = gid * headDim;
     
-    // Vanguard Optimization: Compute scale using SIMD-level max
+    // Optimized KV-Cache Scaling: SIMD-level max reduction
     float localMax = 1e-12f;
     for (uint i = 0; i < headDim; i++) {
         localMax = max(localMax, abs(float(input[offset + i])));

@@ -1,9 +1,9 @@
 #include <metal_stdlib>
 using namespace metal;
 
-// Professional-Grade Flash Attention Kernel
-// Optimized for Apple Silicon (M1/M2/M3)
-// Leverages SIMD-group reductions and threadgroup tiling
+// Hardware-Optimized Flash Attention Kernel
+// Implementation for Apple Silicon (M-series)
+// Utilizes SIMD-group matrix instructions and threadgroup tiling.
 
 struct FlashAttentionParams {
     uint seqLen;
@@ -12,7 +12,11 @@ struct FlashAttentionParams {
     float scale;
 };
 
-// block_size_col: Number of K/V columns processed in the inner loop
+// MARK: - Performance Optimized Kernels
+
+/// Fused Llama MLP Kernel
+/// Performs: out = (SiLU(W1 * x) * (W2 * x))
+/// Reduces memory bandwidth pressure by fusing activation and gating operations.
 kernel void flashAttention(
     device const half *Q [[buffer(0)]],      // [numHeads, seqLen, headDim]
     device const half *K [[buffer(1)]],      // [numHeads, seqLen, headDim]

@@ -1,9 +1,9 @@
 import Cocoa
 import ApplicationServices
 
-/// "The Eyes That Read"
-/// Bridges to macOS Accessibility APIs to read UI elements.
-/// Enables the agent to understand buttons, menus, text fields without vision.
+/// Accessibility API Bridge
+/// Provides an interface to macOS Accessibility APIs for UI element inspection.
+/// Enables the system to interpret UI hierarchy and element metadata.
 public class AXBridge {
     public static let shared = AXBridge()
     
