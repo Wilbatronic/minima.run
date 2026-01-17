@@ -87,13 +87,22 @@ public class VoiceEngine: NSObject, ObservableObject {
         }
     }
     
+    deinit {
+        stopListening()
+        stopSpeaking()
+        print("[VoiceEngine] Deinitialized and cleaned up audio resources.")
+    }
+    
     public func stopListening() {
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
-        recognitionTask?.cancel()
+        if audioEngine.isRunning {
+            audioEngine.stop()
+            audioEngine.inputNode.removeTap(onBus: 0)
+        }
+        
+        recognitionTask?.finish() // Allow task to wrap up gracefully
         recognitionTask = nil
         
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.isListening = false
         }
     }

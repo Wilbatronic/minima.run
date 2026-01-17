@@ -3,6 +3,7 @@ import Combine
 import CoreML
 
 @available(macOS 14.0, iOS 17.0, *)
+@MainActor
 public class MinimaBrain: ObservableObject {
     
     // Subsystems
@@ -34,9 +35,20 @@ public class MinimaBrain: ObservableObject {
             }
         }
         
-        // 2. Vision -> Brain
+        // 2. Vision -> Brain (Vanguard Delta-Gating)
         vision.onEmbeddingsGenerated = { [weak self] embeddings in
-            self?.handleVisualEmbeddings(embeddings)
+            Task { @MainActor in
+                guard let self = self else { return }
+                
+                // Vanguard Optimization: Only ingest if the visual delta is above threshold
+                // This prevents redundant "eye" processing on static screens.
+                let delta = await self.eyes.getLastFrameDelta()
+                if delta > 0.05 { // 5% change threshold
+                    self.handleVisualEmbeddings(embeddings)
+                } else {
+                    print("[Vanguard] Visual Delta (\(delta)) below threshold. Skipping redundant ingestion.")
+                }
+            }
         }
         
         // 3. Synapse (Mesh) -> Brain
@@ -80,11 +92,11 @@ public class MinimaBrain: ObservableObject {
         
         // In a real app, this would be triggering the LLM generation loop
         // We simulate it here using the Bridge
-        Task.detached { [weak self] in
+        Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
-            let response = self.llm.generateResponse(forPrompt: prompt)
+            let response = await self.llm.generateResponse(forPrompt: prompt)
             
-            DispatchQueue.main.async {
+            await MainActor.run {
                 self.answer = response
                 self.isThinking = false
             }

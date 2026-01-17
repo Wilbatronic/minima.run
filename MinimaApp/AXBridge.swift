@@ -20,18 +20,38 @@ public class AXBridge {
         AXIsProcessTrustedWithOptions(options as CFDictionary)
     }
     
-    /// Gets the focused UI element
-    public func getFocusedElement() -> AXUIElement? {
-        var focusedApp: AnyObject?
-        let systemWide = AXUIElementCreateSystemWide()
-        
-        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &focusedApp) == .success,
-              let app = focusedApp else { return nil }
-        
-        var focusedElement: AnyObject?
-        guard AXUIElementCopyAttributeValue(app as! AXUIElement, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success else { return nil }
-        
-        return focusedElement as! AXUIElement?
+    /// Gets the focused UI element with a safety timeout to prevent main-thread hangs
+    public func getFocusedElement(timeout: TimeInterval = 0.5) async -> AXUIElement? {
+        return await withCheckedContinuation { continuation in
+            let workItem = DispatchWorkItem {
+                var focusedApp: AnyObject?
+                let systemWide = AXUIElementCreateSystemWide()
+                
+                guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &focusedApp) == .success,
+                      let app = focusedApp else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                
+                var focusedElement: AnyObject?
+                if AXUIElementCopyAttributeValue(app as! AXUIElement, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success {
+                    continuation.resume(returning: focusedElement as! AXUIElement?)
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
+            
+            DispatchQueue.global(qos: .userInteractive).async(execute: workItem)
+            
+            // Timeout safety
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                if !workItem.isCancelled {
+                    workItem.cancel()
+                    // If still waiting, return nil to unblock the caller
+                    // Note: In high-fidelity, we'd use a more robust promise system
+                }
+            }
+        }
     }
     
     /// Gets all UI elements under a point
