@@ -2,28 +2,56 @@ import Foundation
 
 /// "The Muscle Memory"
 /// Pre-tokenizes and caches the System Prompt KV states.
-/// On subsequent queries, we skip re-encoding the system prompt entirely.
-/// Saves 50-100ms per inference call.
-public class PromptCache {
+/// Formalized as an Actor for thread-safe state and disk I/O.
+public actor PromptCache {
     public static let shared = PromptCache()
     
-    // Cached token IDs for the system prompt
+    private let cacheFileName = "system_prompt.cache"
     private var systemPromptTokens: [Int32]?
     
-    // Number of tokens in the cached system prompt
-    public var cachedTokenCount: Int {
-        return systemPromptTokens?.count ?? 0
+    private var cacheURL: URL {
+        let paths = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)
+        return paths[0].appendingPathComponent(cacheFileName)
     }
     
-    private init() {}
+    private init() {
+        // Initialization in Actor
+    }
     
     /// Call this once at startup to pre-tokenize the system prompt
-    public func warmUp(systemPrompt: String, tokenizer: @escaping (String) -> [Int32]) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let tokens = tokenizer(systemPrompt)
-            self.systemPromptTokens = tokens
-            print("[PromptCache] Cached \(tokens.count) system tokens.")
+    public func warmUp(systemPrompt: String, tokenizer: @escaping @Sendable (String) async -> [Int32]) async {
+        let contentHash = String(systemPrompt.hashValue)
+        
+        // Load from disk if not in memory
+        if systemPromptTokens == nil {
+            await loadFromDisk()
         }
+        
+        if systemPromptTokens != nil, UserDefaults.standard.string(forKey: "minima.promptHash") == contentHash {
+            print("[PromptCache] Cache hit.")
+            return
+        }
+        
+        let tokens = await tokenizer(systemPrompt)
+        self.systemPromptTokens = tokens
+        await saveToDisk()
+        UserDefaults.standard.set(contentHash, forKey: "minima.promptHash")
+        print("[PromptCache] Tokenized and cached \(tokens.count) system tokens.")
+    }
+    
+    private func saveToDisk() {
+        guard let tokens = systemPromptTokens else { return }
+        let data = Data(buffer: UnsafeBufferPointer(start: tokens, count: tokens.count))
+        try? data.write(to: cacheURL)
+    }
+    
+    private func loadFromDisk() {
+        guard let data = try? Data(contentsOf: cacheURL) else { return }
+        let count = data.count / MemoryLayout<Int32>.stride
+        systemPromptTokens = data.withUnsafeBytes { ptr in
+            Array(UnsafeBufferPointer(start: ptr.baseAddress?.assumingMemoryBound(to: Int32.self), count: count))
+        }
+        print("[PromptCache] Loaded \(count) tokens from disk.")
     }
     
     /// Returns the cached tokens if available
@@ -31,19 +59,10 @@ public class PromptCache {
         return systemPromptTokens
     }
     
-    /// Clears the cache (e.g., if system prompt changes)
-    public func invalidate() {
+    /// Clears the cache
+    public func invalidate() async {
         systemPromptTokens = nil
+        try? FileManager.default.removeItem(at: cacheURL)
+        UserDefaults.standard.removeObject(forKey: "minima.promptHash")
     }
 }
-
-// MARK: - Integration with LLMBridge
-// In the real implementation, we would:
-// 1. Call PromptCache.shared.warmUp(...) at app launch
-// 2. In LLMBridge.generateResponse:
-//    - Check if PromptCache has tokens
-//    - If yes, inject them directly into the context without re-encoding
-//    - Then only encode the user's new message
-//
-// This is a "Prefill Optimization" - the system prompt KV cache is computed once
-// and reused for every subsequent query.

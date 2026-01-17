@@ -9,23 +9,35 @@ public class DocumentReader {
     
     private init() {}
     
-    /// Extract text from a PDF file
+    /// Extract text from a PDF or Image file
     public func extractText(from url: URL) async throws -> String {
+        let contentType = UTType(filenameExtension: url.pathExtension)
+        
+        if contentType?.conforms(to: .pdf) == true {
+            return try await extractTextFromPDF(from: url)
+        } else if contentType?.conforms(to: .image) == true {
+            guard let image = UIImage(contentsOfFile: url.path) else {
+                throw DocumentError.invalidImage
+            }
+            return try await recognizeText(in: image)
+        }
+        
+        throw DocumentError.unsupportedFormat
+    }
+    
+    private func extractTextFromPDF(from url: URL) async throws -> String {
         guard let document = PDFDocument(url: url) else {
             throw DocumentError.invalidFile
         }
         
         var fullText = ""
-        
         for pageIndex in 0..<document.pageCount {
             guard let page = document.page(at: pageIndex) else { continue }
-            
             if let pageText = page.string {
                 fullText += pageText + "\n\n"
             }
         }
         
-        // If no text (scanned PDF), use OCR
         if fullText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             fullText = try await extractTextWithOCR(from: url)
         }
@@ -40,11 +52,9 @@ public class DocumentReader {
         }
         
         var fullText = ""
-        
         for pageIndex in 0..<document.pageCount {
             guard let page = document.page(at: pageIndex) else { continue }
             
-            // Render page to image
             let pageRect = page.bounds(for: .mediaBox)
             let renderer = UIGraphicsImageRenderer(size: pageRect.size)
             let image = renderer.image { ctx in
@@ -55,7 +65,6 @@ public class DocumentReader {
                 page.draw(with: .mediaBox, to: ctx.cgContext)
             }
             
-            // Run OCR
             let pageText = try await recognizeText(in: image)
             fullText += pageText + "\n\n"
         }
@@ -85,6 +94,7 @@ public class DocumentReader {
             
             request.recognitionLevel = .accurate
             request.usesLanguageCorrection = true
+            request.minimumTextHeight = 0.01 // Detect small text
             
             let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
             do {
@@ -95,20 +105,25 @@ public class DocumentReader {
         }
     }
     
-    /// Summarize document for context injection
+    /// Summarize document intelligently
     public func summarize(text: String, maxTokens: Int = 2000) -> String {
-        // Rough tokenization (4 chars per token)
         let maxChars = maxTokens * 4
-        if text.count <= maxChars {
-            return text
+        if text.count <= maxChars { return text }
+        
+        // Extract headers or first lines of paragraphs for a better summary
+        let lines = text.components(separatedBy: .newlines)
+        let headers = lines.filter { $0.range(of: "^[A-Z0-9 ]{5,30}$", options: .regularExpression) != nil }
+        
+        let beginning = String(text.prefix(maxChars / 2))
+        let ending = String(text.suffix(maxChars / 2))
+        
+        var summary = beginning + "\n\n[... content truncated ...]\n\n"
+        if !headers.isEmpty {
+            summary += "Key Sections: " + headers.prefix(5).joined(separator: ", ") + "\n\n"
         }
+        summary += ending
         
-        // Take beginning + end (most important parts usually)
-        let halfMax = maxChars / 2
-        let beginning = String(text.prefix(halfMax))
-        let ending = String(text.suffix(halfMax))
-        
-        return beginning + "\n\n[... content truncated ...]\n\n" + ending
+        return summary
     }
 }
 
@@ -116,4 +131,5 @@ enum DocumentError: Error {
     case invalidFile
     case invalidImage
     case ocrFailed
+    case unsupportedFormat
 }

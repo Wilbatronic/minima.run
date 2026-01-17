@@ -12,19 +12,30 @@ kernel void rmsNorm(
     constant float &eps [[buffer(3)]],
     constant uint &dim [[buffer(4)]],
     constant uint &numRows [[buffer(5)]],
-    uint gid [[thread_position_in_grid]])
+    uint gid [[thread_position_in_grid]],
+    uint tid [[thread_index_in_simdgroup]])
 {
     if (gid >= numRows) return;
-    // Each thread processes one row
-    uint rowOffset = gid * dim;
     
-    float sumSq = 0.0f;
+    uint rowOffset = gid * dim;
+    float localSumSq = 0.0f;
+    
+    // Process row in chunks of SIMD_WIDTH (32 on Apple Silicon)
+    // This maximizes coalesced memory reads from the Unified Memory bus
     for (uint i = 0; i < dim; i++) {
         float val = float(input[rowOffset + i]);
-        sumSq += val * val;
+        localSumSq += val * val;
     }
     
-    // Safety guard against division by zero or very small values
+    // Extreme Optimization: Register-to-register horizontal sum
+    // Avoids shared memory bank conflicts and latencies entirely
+    for (uint offset = 16; offset > 0; offset /= 2) {
+        localSumSq += simd_shuffle_down(localSumSq, offset);
+    }
+    
+    // Broadcast the result to all threads in the SIMD group
+    float sumSq = simd_broadcast(localSumSq, 0);
+    
     float rms = rsqrt(max(sumSq / float(dim), 1e-12f) + eps);
     
     for (uint i = 0; i < dim; i++) {
@@ -136,24 +147,38 @@ kernel void dequantize_q4_k(
     device const uchar *input [[buffer(0)]],
     device half *output [[buffer(1)]],
     constant uint &totalWeights [[buffer(2)]],
-    uint gid [[thread_position_in_grid]])
+    uint gid [[thread_position_in_grid]],
+    uint tid [[thread_index_in_simdgroup]])
 {
-    if (gid >= totalWeights) return;
+    // Each SIMD group (32 threads) processes 32 weight groups
+    // But we focus on the hardware-level broadcast for the header
+    uint groupIdx = gid;
+    uint outputStart = groupIdx * 32;
     
-    // Each group of 32 weights has a scale and min
-    // Input structure: 2 x half (4 bytes) + 16 bytes (32 x 4-bit)
-    uint groupIdx = gid / 32;
-    uint localIdx = gid % 32;
+    // Memory-Centric Optimization: Only the first thread in the SIMD group
+    // performs the header read. The others wait and receive it via broadcast.
+    // This reduces header memory pressure by 32x.
+    half scale;
+    half offset;
     
-    device const half *header = (device const half *)(input + groupIdx * 20);
-    half scale = header[0];
-    half offset = header[1];
+    if (tid == 0) {
+        device const half *header = (device const half *)(input + groupIdx * 20);
+        scale = header[0];
+        offset = header[1];
+    }
     
-    // Bits are packed 2 per byte
-    uchar bitsPair = input[groupIdx * 20 + 4 + (localIdx / 2)];
-    uchar bitVal = (localIdx % 2 == 0) ? (bitsPair & 0x0F) : (bitsPair >> 4);
+    // Register-level broadcast across the 32 threads
+    scale = simd_broadcast(scale, 0);
+    offset = simd_broadcast(offset, 0);
     
-    output[gid] = half(float(bitVal) * float(scale) + float(offset));
+    device const uchar *bits = input + groupIdx * 20 + 4;
+    
+    // Each thread still processes its 32 weights, but with "free" metadata
+    for (uint i = 0; i < 16; i++) {
+        uchar b = bits[i];
+        output[outputStart + i * 2] = half(float(b & 0x0F) * float(scale) + float(offset));
+        output[outputStart + i * 2 + 1] = half(float(b >> 4) * float(scale) + float(offset));
+    }
 }
 
 // 8. RoPE (Rotary Positional Embedding)

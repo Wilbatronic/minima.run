@@ -36,6 +36,17 @@ public class VoiceEngine: NSObject, ObservableObject {
         return speechStatus && audioStatus
     }
     
+    // MARK: - Optimization: Pre-warming
+    
+    /// Boots the audio engine and prepares the recognizer to minimize latency on first use.
+    public func warmUp() {
+        Task.detached(priority: .userInitiated) {
+            _ = self.audioEngine.inputNode
+            self.audioEngine.prepare()
+            print("[VoiceEngine] Pre-warmed audio engine.")
+        }
+    }
+    
     // MARK: - Speech-to-Text
     
     public func startListening() throws {
@@ -43,20 +54,25 @@ public class VoiceEngine: NSObject, ObservableObject {
         
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
+        request.requiresOnDeviceRecognition = true // Force high-speed local processing
         
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+        // Lower buffer size (512) for more frequent updates (latency reduction)
+        inputNode.installTap(onBus: 0, bufferSize: 512, format: recordingFormat) { buffer, _ in
             request.append(buffer)
         }
         
-        audioEngine.prepare()
-        try audioEngine.start()
+        // If not already running from warmUp
+        if !audioEngine.isRunning {
+            audioEngine.prepare()
+            try audioEngine.start()
+        }
         
         recognitionTask = speechRecognizer?.recognitionTask(with: request) { [weak self] result, error in
             if let result = result {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self?.transcribedText = result.bestTranscription.formattedString
                 }
             }
@@ -87,8 +103,15 @@ public class VoiceEngine: NSObject, ObservableObject {
     public func speak(_ text: String, rate: Float = 0.5) {
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = rate
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        
+        // Attempt to use Apple's high-fidelity "Ava" or Siri premium voices if available
+        if let premiumVoice = AVSpeechSynthesisVoice(identifier: "com.apple.ttsbundle.siri_Ava_en-US_compact") ?? 
+                            AVSpeechSynthesisVoice(language: "en-US") {
+            utterance.voice = premiumVoice
+        }
+        
         utterance.pitchMultiplier = 1.0
+        utterance.volume = 1.0
         
         synthesizer.speak(utterance)
     }

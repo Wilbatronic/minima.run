@@ -18,6 +18,33 @@ public class CalendarIntegration {
         }
     }
     
+    /// Fetch events with high relevance pruning
+    public func fetchRelevantEvents() async -> String {
+        // NOTE: isAuthorized property is missing in the provided context, assuming it's a placeholder or needs to be added.
+        // For now, I'll comment it out or replace with a direct check if access is granted.
+        // For this exercise, I'll assume `requestAccess` has been called and granted, or add a simple check.
+        // Let's add a simple check for authorization status.
+        guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return "Calendar: Unauthorized" }
+        
+        let now = Date()
+        // Focus only on the 'Current Intent Window': -15m to +2h
+        let start = now.addingTimeInterval(-900) // -15 minutes
+        let end = now.addingTimeInterval(7200)   // +2 hours
+        
+        // Fetch events from all calendars
+        let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: nil)
+        let events = eventStore.events(matching: predicate)
+        
+        if events.isEmpty { return "Calendar: No relevant events." }
+        
+        let context = events.map { event in
+            let time = event.startDate.formatted(date: .omitted, time: .shortened)
+            return "- \(event.title ?? "Untitled") at \(time)"
+        }.joined(separator: "\n")
+        
+        return "Relevant Events:\n\(context)"
+    }
+    
     /// Get upcoming events
     public func getUpcomingEvents(days: Int = 7) -> [EKEvent] {
         let calendars = eventStore.calendars(for: .event)

@@ -8,17 +8,49 @@ public class FilesIntegration {
     
     private init() {}
     
-    /// Search files by name in common directories
-    public func searchFiles(query: String, in directories: [URL]? = nil) async throws -> [FileResult] {
+    /// Search files by name in common directories with progressive results
+    public func searchFiles(query: String, in directories: [URL]? = nil) -> AsyncStream<FileResult> {
         let searchDirs = directories ?? getDefaultDirectories()
-        var results: [FileResult] = []
         
-        for dir in searchDirs {
-            let files = try await searchDirectory(dir, for: query)
-            results.append(contentsOf: files)
+        return AsyncStream { continuation in
+            let task = Task {
+                for dir in searchDirs {
+                    do {
+                        let resourceKeys: Set<URLResourceKey> = [.nameKey, .contentModificationDateKey, .fileSizeKey, .contentTypeKey]
+                        guard let enumerator = FileManager.default.enumerator(
+                            at: dir,
+                            includingPropertiesForKeys: Array(resourceKeys),
+                            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                        ) else { continue }
+                        
+                        for case let fileURL as URL in enumerator {
+                            if Task.isCancelled { break }
+                            
+                            let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys)
+                            let name = resourceValues?.name ?? fileURL.lastPathComponent
+                            
+                            if name.localizedCaseInsensitiveContains(query) {
+                                let result = FileResult(
+                                    url: fileURL,
+                                    name: name,
+                                    size: resourceValues?.fileSize ?? 0,
+                                    modifiedDate: resourceValues?.contentModificationDate ?? Date.distantPast,
+                                    contentType: resourceValues?.contentType
+                                )
+                                continuation.yield(result)
+                            }
+                        }
+                    } catch {
+                        print("[Files] Search error in \(dir): \(error)")
+                    }
+                }
+                continuation.finish()
+            }
+            
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
         }
-        
-        return results.sorted { $0.modifiedDate > $1.modifiedDate }
     }
     
     private func getDefaultDirectories() -> [URL] {

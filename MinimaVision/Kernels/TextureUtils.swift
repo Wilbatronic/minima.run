@@ -94,9 +94,7 @@ public class TextureUtils {
         )
         encoder.setBytes(&uniforms, length: MemoryLayout<InputUniforms>.stride, index: 1)
         
-        let width = pipeline.threadExecutionWidth
-        let height = pipeline.maxTotalThreadsPerThreadgroup / width
-        let threadsPerGroup = MTLSizeMake(width, height, 1)
+        let threadsPerGroup = MTLSizeMake(16, 16, 1)
         let threadsPerGrid = MTLSizeMake(texture.width, texture.height, 1)
         
         encoder.dispatchThreads(threadsPerGrid, threadsPerThreadgroup: threadsPerGroup)

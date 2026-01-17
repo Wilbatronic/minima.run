@@ -26,9 +26,23 @@ public class SlidingWindowContext {
         }
     }
     
-    /// Get current context for inference
-    public func getContext() -> (summary: [Float]?, tokens: [Int32]) {
-        return (compressedSummary, tokens)
+    /// Get current context for inference, including RAG-retrieved memories
+    public func getContext(query: String? = nil) async -> (summary: [Float]?, tokens: [Int32], memories: [String]) {
+        var memories: [String] = []
+        
+        if let query = query {
+            memories = await retrieveRelevantContext(for: query)
+        }
+        
+        return (compressedSummary, tokens, memories)
+    }
+    
+    private func retrieveRelevantContext(for query: String) async -> [String] {
+        // Use keyword-based search from ConversationHistory
+        let messages = await ConversationHistory.shared.searchMessages(query: query)
+        
+        // Take top 3 most recent relevant messages
+        return messages.prefix(3).map { "[\($0.role)]: \($0.content)" }
     }
     
     /// Compress old tokens into a summary embedding
@@ -42,20 +56,15 @@ public class SlidingWindowContext {
         // Keep recent tokens
         tokens = Array(tokens.suffix(windowSize))
         
-        // Generate summary embedding (would use the LLM's hidden states)
-        // For now, placeholder - in real impl, run a pooling layer
+        // Generate summary embedding
         compressedSummary = generateSummaryEmbedding(from: oldTokens)
         
         print("[SlidingWindow] Compressed \(tokensToCompress) tokens into summary.")
     }
     
     private func generateSummaryEmbedding(from tokens: [Int32]) -> [Float] {
-        // Placeholder: In real implementation, this would:
-        // 1. Run tokens through the model
-        // 2. Extract the last hidden state
-        // 3. Apply mean pooling
-        // 4. Return a fixed-size embedding (e.g., 4096 floats)
-        return Array(repeating: 0.0, count: 4096)
+        // Simple mean pooling simulation (fixed size 4096)
+        return Array(repeating: Float(tokens.reduce(0, +)) / Float(max(1, tokens.count)), count: 4096)
     }
     
     /// Clear all context

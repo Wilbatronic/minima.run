@@ -12,16 +12,16 @@ struct GhostBarView: View {
     var body: some View {
         HStack(spacing: 12) {
             
-            // 1. Context Indicator / "Look" Button
+            // 1. Context Indicator
             Button(action: {
                 captureContext()
             }) {
                 Image(systemName: "eye")
                     .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.secondary)
+                    .symbolEffect(.bounce, value: isThinking)
+                    .foregroundColor(isThinking ? .purple : .secondary)
             }
             .buttonStyle(.plain)
-            .help("Look at current screen")
             
             // 2. Input Field
             TextField("Ask Minima...", text: $inputText)
@@ -33,28 +33,26 @@ struct GhostBarView: View {
             
             // 3. Status/Thinking Pulse
             if isThinking {
-                Circle()
-                    .fill(Color.purple)
-                    .frame(width: 8, height: 8)
-                    .phaseAnimator([0.5, 1.0]) { content, phase in
-                        content.opacity(phase).scaleEffect(phase)
-                    } animation: { _ in
-                        .easeInOut(duration: 0.8)
-                    }
+                LuminousThinkingPulse()
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.black.opacity(0.1)) // Subtle tint
-                .background(GlassEffect(material: .hudWindow, blendingMode: .behindWindow))
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-                .shadow(color: Color.black.opacity(0.2), radius: 20, x: 0, y: 10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
-                )
+            ZStack {
+                // Dynamic Luminous Border
+                RoundedRectangle(cornerRadius: 28)
+                    .stroke(
+                        LinearGradient(colors: [.purple, .blue, .purple], startPoint: .leading, endPoint: .trailing),
+                        lineWidth: isThinking ? 2.0 : 0.5
+                    )
+                    .opacity(isThinking ? 1.0 : 0.3)
+                    .blur(radius: isThinking ? 4 : 0)
+                
+                // Base Glass
+                Color.black.opacity(0.05)
+                    .liquidGlass(cornerRadius: 28)
+            }
         )
         // Drag & Drop
         .onDrop(of: [.fileURL, .image], isTargeted: $isHovering) { providers in
@@ -85,5 +83,22 @@ struct GhostBarView: View {
     private func handleDrop(_ providers: [NSItemProvider]) {
         print("Dropped \(providers.count) items")
         // Handle files
+    }
+}
+
+struct LuminousThinkingPulse: View {
+    @State private var pulse = 0.0
+    
+    var body: some View {
+        Circle()
+            .fill(RadialGradient(colors: [.purple, .clear], center: .center, startRadius: 0, endRadius: 10))
+            .frame(width: 12, height: 12)
+            .scaleEffect(1.0 + pulse)
+            .opacity(1.0 - pulse)
+            .onAppear {
+                withAnimation(.easeOut(duration: 1.2).repeatForever(autoreverses: false)) {
+                    pulse = 1.0
+                }
+            }
     }
 }

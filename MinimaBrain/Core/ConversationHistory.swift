@@ -103,4 +103,16 @@ public class ConversationHistory {
         container.mainContext.delete(conversation)
         try? container.mainContext.save()
     }
+    
+    @MainActor
+    public func searchMessages(query: String) -> [Message] {
+        guard let container = container else { return [] }
+        let descriptor = FetchDescriptor<Message>(
+            predicate: #Predicate<Message> { message in
+                message.content.contains(query)
+            },
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+        return (try? container.mainContext.fetch(descriptor)) ?? []
+    }
 }

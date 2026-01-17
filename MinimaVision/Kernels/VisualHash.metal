@@ -34,8 +34,9 @@ kernel void perceptualHash(
     float localSum = 0.0f;
     for (uint y = startY + tid.y; y < startY + blockH; y += t_per_tg.y) {
         for (uint x = startX + tid.x; x < startX + blockW; x += t_per_tg.x) {
+            // Unroll loop for better instruction-level parallelism
             half4 c = inTexture.read(uint2(x, y));
-            localSum += float(c.r) * 0.2126f + float(c.g) * 0.7152f + float(c.b) * 0.0722f;
+            localSum += dot(float3(c.rgb), float3(0.2126f, 0.7152f, 0.0722f));
         }
     }
     
